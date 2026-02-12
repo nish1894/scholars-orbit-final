@@ -3,6 +3,8 @@ import LandingPage from './components/LandingPage';
 import DashboardPage from './pages/DashboardPage';
 import LoginPageFull from './pages/LoginPageFull';
 import SignupPageFull from './pages/SignupPageFull';
+import ProfilePage from './pages/ProfilePage';
+import AIStudyBot from './pages/AIStudyBot';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginModal from './pages/LoginPage';
 import SignupModal from './pages/SignupPage';
@@ -15,8 +17,17 @@ function AppContent() {
     <>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/ai-study-bot" element={<AIStudyBot />} />
         <Route path="/login" element={<LoginPageFull />} />
         <Route path="/signup" element={<SignupPageFull />} />
+        <Route
+          path="/profile/:id"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/dashboard"
           element={

@@ -1,33 +1,52 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const LandingPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { openLogin, openSignup } = useAuth();
+  const { user, openLogin, openSignup, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-dark-900 via-dark-800 to-dark-900">
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-white/95 backdrop-blur-lg border-b border-gray-200 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center space-x-2">
             <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-xl">S</span>
             </div>
             <span className="text-2xl font-display font-bold text-dark-900">
               Scholars<span className="text-primary-500">Orbit</span>
             </span>
-          </div>
+          </Link>
 
           <div className="hidden md:flex space-x-8">
             <a href="#features" className="text-gray-600 hover:text-primary-500 transition-colors">Features</a>
             <a href="#about" className="text-gray-600 hover:text-primary-500 transition-colors">About</a>
             <a href="#contact" className="text-gray-600 hover:text-primary-500 transition-colors">Contact</a>
+            <Link to="/ai-study-bot" className="text-gray-600 hover:text-primary-500 transition-colors">AI Study Bot</Link>
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
-            <button onClick={() => openLogin()} className="text-gray-600 hover:text-dark-900 transition-colors">Login</button>
-            <button onClick={() => openSignup()} className="btn-primary">Get Started</button>
+            {user ? (
+              <>
+                <Link
+                  to={`/profile/${user.id}`}
+                  className="w-9 h-9 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center text-white font-bold text-sm hover:scale-110 transition-transform"
+                  aria-label="Go to profile"
+                >
+                  {user.name?.charAt(0).toUpperCase()}
+                </Link>
+                <button onClick={logout} className="text-gray-600 hover:text-red-500 transition-colors text-sm font-medium">
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => openLogin()} className="text-gray-600 hover:text-dark-900 transition-colors">Login</button>
+                <button onClick={() => openSignup()} className="btn-primary">Get Started</button>
+              </>
+            )}
           </div>
 
           {/* Mobile hamburger button */}
@@ -48,9 +67,26 @@ const LandingPage = () => {
             <a href="#features" className="block text-gray-600 hover:text-primary-500 transition-colors" onClick={() => setMobileMenuOpen(false)}>Features</a>
             <a href="#about" className="block text-gray-600 hover:text-primary-500 transition-colors" onClick={() => setMobileMenuOpen(false)}>About</a>
             <a href="#contact" className="block text-gray-600 hover:text-primary-500 transition-colors" onClick={() => setMobileMenuOpen(false)}>Contact</a>
+            <Link to="/ai-study-bot" className="block text-gray-600 hover:text-primary-500 transition-colors" onClick={() => setMobileMenuOpen(false)}>AI Study Bot</Link>
             <hr className="border-gray-200" />
-            <button onClick={() => { setMobileMenuOpen(false); openLogin(); }} className="block w-full text-left text-gray-600 hover:text-dark-900 transition-colors">Login</button>
-            <button onClick={() => { setMobileMenuOpen(false); openSignup(); }} className="btn-primary w-full">Get Started</button>
+            {user ? (
+              <>
+                <Link
+                  to={`/profile/${user.id}`}
+                  className="block text-gray-600 hover:text-primary-500 transition-colors font-medium"
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Go to profile"
+                >
+                  Profile
+                </Link>
+                <button onClick={() => { setMobileMenuOpen(false); logout(); }} className="block w-full text-left text-gray-600 hover:text-red-500 transition-colors">Logout</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => { setMobileMenuOpen(false); openLogin(); }} className="block w-full text-left text-gray-600 hover:text-dark-900 transition-colors">Login</button>
+                <button onClick={() => { setMobileMenuOpen(false); openSignup(); }} className="btn-primary w-full">Get Started</button>
+              </>
+            )}
           </div>
         )}
       </nav>
@@ -109,7 +145,7 @@ const LandingPage = () => {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-blue-600 opacity-20 blur-3xl"></div>
               <div className="relative grid grid-cols-2 gap-4">
-                <div className="card space-y-3 transform hover:-translate-y-2 transition-transform">
+                <div className="card space-y-3 transform hover:-translate-y-2 transition-transform cursor-pointer">
                   <div className="w-12 h-12 bg-primary-500/20 rounded-lg flex items-center justify-center">
                     <span className="text-2xl">📚</span>
                   </div>
@@ -117,15 +153,15 @@ const LandingPage = () => {
                   <p className="text-sm text-gray-400">Access thousands of notes, videos & PDFs</p>
                 </div>
                 
-                <div className="card space-y-3 transform hover:-translate-y-2 transition-transform mt-8">
+                <Link to="/ai-study-bot" className="card space-y-3 transform hover:-translate-y-2 transition-transform cursor-pointer mt-8 block">
                   <div className="w-12 h-12 bg-primary-500/20 rounded-lg flex items-center justify-center">
                     <span className="text-2xl">🤖</span>
                   </div>
                   <h3 className="text-lg font-semibold text-white">AI Study Assistant</h3>
                   <p className="text-sm text-gray-400">Get instant doubt solving 24/7</p>
-                </div>
+                </Link>
                 
-                <div className="card space-y-3 transform hover:-translate-y-2 transition-transform">
+                <div className="card space-y-3 transform hover:-translate-y-2 transition-transform cursor-pointer">
                   <div className="w-12 h-12 bg-primary-500/20 rounded-lg flex items-center justify-center">
                     <span className="text-2xl">👥</span>
                   </div>
@@ -133,7 +169,7 @@ const LandingPage = () => {
                   <p className="text-sm text-gray-400">Connect with students nationwide</p>
                 </div>
                 
-                <div className="card space-y-3 transform hover:-translate-y-2 transition-transform mt-8">
+                <div className="card space-y-3 transform hover:-translate-y-2 transition-transform cursor-pointer mt-8">
                   <div className="w-12 h-12 bg-primary-500/20 rounded-lg flex items-center justify-center">
                     <span className="text-2xl">🎓</span>
                   </div>

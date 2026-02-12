@@ -66,18 +66,26 @@ export default function DashboardPage() {
         {/* Feature cards */}
         <h2 className="text-xl font-display font-bold text-white mb-4">Quick Access</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {features.map((f) => (
-            <div
-              key={f.title}
-              className="bg-dark-800 rounded-xl p-6 border border-dark-700 hover:border-primary-500 transition-all duration-300 cursor-pointer group"
-            >
-              <div className={`w-12 h-12 bg-gradient-to-br ${f.color} rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                <span className="text-2xl">{f.icon}</span>
+          {features.map((f) => {
+            const isAI = f.title === 'AI Assistant';
+            const card = (
+              <div
+                key={f.title}
+                className="bg-dark-800 rounded-xl p-6 border border-dark-700 hover:border-primary-500 transition-all duration-300 cursor-pointer group"
+              >
+                <div className={`w-12 h-12 bg-gradient-to-br ${f.color} rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                  <span className="text-2xl">{f.icon}</span>
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-1">{f.title}</h3>
+                <p className="text-sm text-gray-400">{f.desc}</p>
               </div>
-              <h3 className="text-lg font-semibold text-white mb-1">{f.title}</h3>
-              <p className="text-sm text-gray-400">{f.desc}</p>
-            </div>
-          ))}
+            );
+            return isAI ? (
+              <Link to="/ai-study-bot" key={f.title}>{card}</Link>
+            ) : (
+              card
+            );
+          })}
         </div>
       </div>
     </div>

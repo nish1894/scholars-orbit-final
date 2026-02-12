@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { openLogin, openSignup } = useAuth();
+  const { user, openLogin, openSignup, logout } = useAuth();
 
   return (
     <nav className="sticky top-0 w-full bg-white/95 backdrop-blur-lg border-b border-gray-200 z-50">
@@ -25,8 +25,25 @@ export default function Header() {
         </div>
 
         <div className="hidden md:flex items-center space-x-4">
-          <button onClick={() => openLogin()} className="text-gray-600 hover:text-dark-900 transition-colors">Login</button>
-          <button onClick={() => openSignup()} className="btn-primary">Get Started</button>
+          {user ? (
+            <>
+              <Link
+                to={`/profile/${user.id}`}
+                className="w-9 h-9 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center text-white font-bold text-sm hover:scale-110 transition-transform"
+                aria-label="Go to profile"
+              >
+                {user.name?.charAt(0).toUpperCase()}
+              </Link>
+              <button onClick={logout} className="text-gray-600 hover:text-red-500 transition-colors text-sm font-medium">
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => openLogin()} className="text-gray-600 hover:text-dark-900 transition-colors">Login</button>
+              <button onClick={() => openSignup()} className="btn-primary">Get Started</button>
+            </>
+          )}
         </div>
 
         {/* Mobile hamburger button */}
@@ -47,8 +64,24 @@ export default function Header() {
           <Link to="/#about" className="block text-gray-600 hover:text-primary-500 transition-colors" onClick={() => setMobileMenuOpen(false)}>About</Link>
           <Link to="/#contact" className="block text-gray-600 hover:text-primary-500 transition-colors" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
           <hr className="border-gray-200" />
-          <button onClick={() => { setMobileMenuOpen(false); openLogin(); }} className="block w-full text-left text-gray-600 hover:text-dark-900 transition-colors">Login</button>
-          <button onClick={() => { setMobileMenuOpen(false); openSignup(); }} className="btn-primary w-full">Get Started</button>
+          {user ? (
+            <>
+              <Link
+                to={`/profile/${user.id}`}
+                className="block text-gray-600 hover:text-primary-500 transition-colors font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Go to profile"
+              >
+                Profile
+              </Link>
+              <button onClick={() => { setMobileMenuOpen(false); logout(); }} className="block w-full text-left text-gray-600 hover:text-red-500 transition-colors">Logout</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { setMobileMenuOpen(false); openLogin(); }} className="block w-full text-left text-gray-600 hover:text-dark-900 transition-colors">Login</button>
+              <button onClick={() => { setMobileMenuOpen(false); openSignup(); }} className="btn-primary w-full">Get Started</button>
+            </>
+          )}
         </div>
       )}
     </nav>
