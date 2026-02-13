@@ -16,7 +16,7 @@ await connectDB();
 // Middleware
 const allowedOrigins = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(',').map((s) => s.trim())
-  : ['http://localhost:5173'];
+  : ['http://localhost:5173', 'https://scholars-orbit.vercel.app'];
 
 app.use(
   cors({
