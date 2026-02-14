@@ -13,24 +13,28 @@ const PORT = process.env.PORT || 5000;
 // Connect to MongoDB
 await connectDB();
 
-// Middleware
-const allowedOrigins = process.env.CLIENT_URL
-  ? process.env.CLIENT_URL.split(',').map((s) => s.trim())
-  : ['http://localhost:5173', 'https://scholars-orbit.vercel.app'];
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, health checks)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  })
+const allowedOrigins = (
+  process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(',').map((s) => s.trim())
+    : []
 );
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+
+    if (
+      origin === "http://localhost:5173" ||
+      origin === "https://scholars-orbit.vercel.app" ||
+      allowedOrigins.includes(origin)
+    ) {
+      return callback(null, true);
+    }
+
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // Routes
