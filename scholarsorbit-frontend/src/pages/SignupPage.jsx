@@ -38,14 +38,14 @@ export default function SignupModal() {
     return errs;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setServerError('');
     const errs = validate();
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
-    const result = signup({ name: form.name, email: form.email, password: form.password });
+    const result = await signup({ name: form.name, email: form.email, password: form.password });
     if (result.success) {
       closeAuth();
     } else {

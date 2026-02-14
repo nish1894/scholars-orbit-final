@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth`;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -9,51 +10,67 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const stored = localStorage.getItem('scholarsOrbitUser');
-    if (stored) {
+    const token = localStorage.getItem('scholarsOrbitToken');
+    if (stored && token) {
       try {
         setUser(JSON.parse(stored));
       } catch {
         localStorage.removeItem('scholarsOrbitUser');
+        localStorage.removeItem('scholarsOrbitToken');
       }
     }
     setLoading(false);
   }, []);
 
-  const login = (email, password) => {
-    // Check against stored registered users
-    const users = JSON.parse(localStorage.getItem('scholarsOrbitUsers') || '[]');
-    const found = users.find((u) => u.email === email && u.password === password);
+  const login = async (email, password) => {
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
 
-    if (found) {
-      const { password: _, ...userData } = found;
-      setUser(userData);
-      localStorage.setItem('scholarsOrbitUser', JSON.stringify(userData));
+      if (!res.ok) {
+        return { success: false, error: data.message || 'Invalid credentials' };
+      }
+
+      setUser(data.user);
+      localStorage.setItem('scholarsOrbitUser', JSON.stringify(data.user));
+      localStorage.setItem('scholarsOrbitToken', data.token);
       return { success: true };
+    } catch {
+      return { success: false, error: 'Network error. Please try again.' };
     }
-
-    return { success: false, error: 'Invalid email or password' };
   };
 
-  const signup = ({ name, email, password }) => {
-    const users = JSON.parse(localStorage.getItem('scholarsOrbitUsers') || '[]');
+  const signup = async ({ name, email, password }) => {
+    try {
+      const res = await fetch(`${API_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
+      const data = await res.json();
 
-    if (users.some((u) => u.email === email)) {
-      return { success: false, error: 'An account with this email already exists' };
+      if (!res.ok) {
+        const errorMsg = data.message || data.errors?.[0]?.msg || 'Registration failed';
+        return { success: false, error: errorMsg };
+      }
+
+      setUser(data.user);
+      localStorage.setItem('scholarsOrbitUser', JSON.stringify(data.user));
+      localStorage.setItem('scholarsOrbitToken', data.token);
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Network error. Please try again.' };
     }
-
-    const newUser = { id: Date.now().toString(), name, email, password };
-    users.push(newUser);
-    localStorage.setItem('scholarsOrbitUsers', JSON.stringify(users));
-
-    const { password: _, ...userData } = newUser;
-    setUser(userData);
-    localStorage.setItem('scholarsOrbitUser', JSON.stringify(userData));
-    return { success: true };
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('scholarsOrbitUser');
+    localStorage.removeItem('scholarsOrbitToken');
   };
 
   const openLogin = () => setAuthModal('login');

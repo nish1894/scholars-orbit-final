@@ -16,14 +16,14 @@ export default function LoginModal() {
     return errs;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setServerError('');
     const errs = validate();
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
-    const result = login(email, password);
+    const result = await login(email, password);
     if (result.success) {
       closeAuth();
     } else {

@@ -33,6 +33,9 @@ router.post(
     try {
       const { name, email, password, userType } = req.body;
 
+      console.log("Signup route hit");
+      console.log(req.body);
+
       const existing = await User.findOne({ email });
       if (existing) {
         return res.status(409).json({ message: 'Email already registered' });
