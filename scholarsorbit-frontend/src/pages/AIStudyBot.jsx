@@ -2,18 +2,29 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/chat`;
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const API_URL = `${BASE_URL}/api/chat`;
+const SUGGESTIONS_URL = `${BASE_URL}/api/suggestions`;
+const STREAM_TICK_MS = 15;
 
 export default function AIStudyBot() {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [mode, setMode] = useState('scholar');
+  const [level, setLevel] = useState('intermediate');
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [serverConvId, setServerConvId] = useState(null);
+  const [currentSubject, setCurrentSubject] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [clickedSuggestionIds, setClickedSuggestionIds] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const streamRef = useRef(null);
 
   // Load conversation list on mount
   useEffect(() => {
@@ -24,6 +35,22 @@ export default function AIStudyBot() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Cleanup stream interval on unmount
+  useEffect(() => {
+    return () => { if (streamRef.current) clearInterval(streamRef.current); };
+  }, []);
+
+  // Fetch suggestions when subject changes
+  useEffect(() => {
+    if (!currentSubject || currentSubject === 'Other') return;
+    const params = new URLSearchParams({ subject: currentSubject });
+    if (clickedSuggestionIds.length) params.set('exclude', clickedSuggestionIds.join(','));
+    fetch(`${SUGGESTIONS_URL}?${params}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.suggestions) setSuggestions(data.suggestions); })
+      .catch(() => {});
+  }, [currentSubject, clickedSuggestionIds]);
 
   // Focus input on load and conversation switch
   useEffect(() => {
@@ -60,7 +87,7 @@ export default function AIStudyBot() {
 
   const handleSend = async () => {
     const trimmed = input.trim();
-    if (!trimmed || loading) return;
+    if (!trimmed || loading || streaming) return;
 
     const userMsg = { role: 'user', content: trimmed };
     const updated = [...messages, userMsg];
@@ -69,25 +96,57 @@ export default function AIStudyBot() {
     setLoading(true);
 
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      const token = localStorage.getItem('scholarsOrbitToken');
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`${API_URL}/message`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed, history: messages }),
+        headers,
+        body: JSON.stringify({ message: trimmed, mode, level, conversationId: serverConvId }),
       });
 
       if (!res.ok) throw new Error('API request failed');
 
       const data = await res.json();
-      const assistantMsg = { role: 'assistant', content: data.reply };
-      const withReply = [...updated, assistantMsg];
-      setMessages(withReply);
-      saveConversation(withReply);
+      if (data.conversationId) setServerConvId(data.conversationId);
+      if (data.subject) setCurrentSubject(data.subject);
+
+      const fullReply = data.reply;
+
+      // Switch from "thinking" to "streaming" phase
+      setLoading(false);
+      setStreaming(true);
+
+      // Add empty assistant bubble and stream into it
+      setMessages([...updated, { role: 'assistant', content: '' }]);
+
+      const charsPerTick = Math.max(8, Math.ceil(fullReply.length / 200));
+      let charIndex = 0;
+
+      streamRef.current = setInterval(() => {
+        charIndex = Math.min(charIndex + charsPerTick, fullReply.length);
+        const partial = fullReply.slice(0, charIndex);
+
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = { role: 'assistant', content: partial };
+          return copy;
+        });
+
+        if (charIndex >= fullReply.length) {
+          clearInterval(streamRef.current);
+          streamRef.current = null;
+          setStreaming(false);
+          const finalMessages = [...updated, { role: 'assistant', content: fullReply }];
+          setMessages(finalMessages);
+          saveConversation(finalMessages);
+        }
+      }, STREAM_TICK_MS);
     } catch (err) {
       console.error('Chat error:', err);
       const errorMsg = { role: 'assistant', content: `Sorry, something went wrong: ${err.message}. Please check the browser console and ensure the backend server is running on port 5001.` };
-      const withError = [...updated, errorMsg];
-      setMessages(withError);
-    } finally {
+      setMessages([...updated, errorMsg]);
       setLoading(false);
     }
   };
@@ -108,7 +167,23 @@ export default function AIStudyBot() {
   const startNewChat = () => {
     setMessages([]);
     setActiveConversationId(null);
+    setServerConvId(null);
+    setCurrentSubject(null);
+    setSuggestions([]);
+    setClickedSuggestionIds([]);
     setSidebarOpen(false);
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    setInput(suggestion.text);
+    setClickedSuggestionIds((prev) => [...prev, suggestion._id]);
+    // Fire-and-forget click count
+    fetch(`${SUGGESTIONS_URL}/click`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: suggestion._id }),
+    }).catch(() => {});
+    inputRef.current?.focus();
   };
 
   const deleteConversation = (id, e) => {
@@ -133,13 +208,13 @@ export default function AIStudyBot() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-b from-slate-50 to-purple-50/30">
-      {/* Top Nav */}
-      <nav className="bg-white/90 backdrop-blur-lg border-b border-purple-100 px-4 py-3 flex items-center justify-between shrink-0">
+    <div className="h-screen flex flex-col overflow-hidden">
+      {/* Top Nav — fixed height */}
+      <nav className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-purple-50 transition-colors"
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
             aria-label="Toggle sidebar"
           >
             <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -147,11 +222,11 @@ export default function AIStudyBot() {
             </svg>
           </button>
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">S</span>
             </div>
             <span className="text-lg font-display font-bold text-gray-800">
-              Study<span className="text-purple-500">Bot</span>
+              Study<span className="text-purple-600">Bot</span>
             </span>
           </Link>
         </div>
@@ -159,7 +234,7 @@ export default function AIStudyBot() {
         <div className="flex items-center gap-2">
           <button
             onClick={startNewChat}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-sm font-medium hover:shadow-lg hover:scale-105 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -177,6 +252,7 @@ export default function AIStudyBot() {
         </div>
       </nav>
 
+      {/* 3-column flex layout — fills remaining height */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar Overlay (mobile) */}
         {sidebarOpen && (
@@ -186,15 +262,17 @@ export default function AIStudyBot() {
           />
         )}
 
-        {/* Sidebar */}
+        {/* Left Sidebar — Chat History */}
         <aside
           className={`
-            fixed lg:static inset-y-0 left-0 z-40 w-72 bg-white/80 backdrop-blur-lg border-r border-purple-100
-            transform transition-transform duration-300 lg:transform-none flex flex-col
+            fixed lg:static inset-y-0 left-0 z-40 w-72 lg:w-[280px] shrink-0
+            bg-gray-50 border-r border-gray-200
+            transform transition-transform duration-300 lg:transform-none
+            flex flex-col
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           `}
         >
-          <div className="p-4 border-b border-purple-100">
+          <div className="p-4 border-b border-gray-200 shrink-0">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Chat History</h2>
           </div>
 
@@ -209,10 +287,10 @@ export default function AIStudyBot() {
                   key={conv.id}
                   onClick={() => loadConversation(conv)}
                   className={`
-                    group flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-all
+                    group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors
                     ${activeConversationId === conv.id
-                      ? 'bg-purple-100 text-purple-700'
-                      : 'hover:bg-purple-50 text-gray-700'}
+                      ? 'bg-purple-50 text-purple-700'
+                      : 'hover:bg-white text-gray-700'}
                   `}
                 >
                   <div className="min-w-0 flex-1">
@@ -221,7 +299,7 @@ export default function AIStudyBot() {
                   </div>
                   <button
                     onClick={(e) => deleteConversation(conv.id, e)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-500 transition-all shrink-0 ml-2"
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all shrink-0 ml-2"
                     aria-label="Delete conversation"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,13 +313,13 @@ export default function AIStudyBot() {
         </aside>
 
         {/* Main Chat Area */}
-        <main className="flex-1 flex flex-col min-w-0">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-6">
+        <main className="flex flex-col flex-1 min-w-0">
+          {/* Messages — only this div scrolls */}
+          <div className="flex-1 overflow-y-auto bg-white px-4 py-6">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-pink-400 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
-                  <span className="text-4xl">🤖</span>
+                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mb-5">
+                  <span className="text-3xl">🤖</span>
                 </div>
                 <h2 className="text-2xl font-display font-bold text-gray-800 mb-2">
                   AI Study Assistant
@@ -259,7 +337,7 @@ export default function AIStudyBot() {
                     <button
                       key={q}
                       onClick={() => { setInput(q); inputRef.current?.focus(); }}
-                      className="text-left px-4 py-3 rounded-xl border border-purple-200 bg-white hover:border-purple-400 hover:shadow-md transition-all text-sm text-gray-700"
+                      className="text-left px-4 py-3 rounded-lg border border-gray-200 bg-white hover:border-gray-400 hover:bg-gray-50 transition-all text-sm text-gray-700"
                     >
                       {q}
                     </button>
@@ -268,31 +346,40 @@ export default function AIStudyBot() {
               </div>
             ) : (
               <div className="max-w-3xl mx-auto space-y-4">
-                {messages.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
+                {messages.map((msg, i) => {
+                  const isStreamingMsg = streaming && msg.role === 'assistant' && i === messages.length - 1;
+                  return (
                     <div
-                      className={`
-                        max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap
-                        ${msg.role === 'user'
-                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-br-md'
-                          : 'bg-white border border-purple-100 text-gray-700 rounded-bl-md shadow-sm'}
-                      `}
+                      key={i}
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      {msg.content}
+                      <div
+                        className={`
+                          max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap
+                          ${msg.role === 'user'
+                            ? 'bg-purple-600 text-white rounded-br-md'
+                            : 'bg-gray-100 text-gray-700 rounded-bl-md'}
+                        `}
+                      >
+                        {msg.content}
+                        {isStreamingMsg && (
+                          <span className="inline-block w-0.5 h-4 bg-purple-500 ml-0.5 align-middle animate-pulse" />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {loading && (
                   <div className="flex justify-start">
-                    <div className="bg-white border border-purple-100 px-4 py-3 rounded-2xl rounded-bl-md shadow-sm">
-                      <div className="flex gap-1.5">
-                        <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-bl-md">
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1.5">
+                          <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                        <span className="text-xs text-gray-400">Thinking...</span>
                       </div>
                     </div>
                   </div>
@@ -303,8 +390,51 @@ export default function AIStudyBot() {
             )}
           </div>
 
-          {/* Input Area */}
-          <div className="border-t border-purple-100 bg-white/80 backdrop-blur-lg px-4 py-4">
+          {/* Input Area — fixed bottom */}
+          <div className="border-t border-gray-200 bg-white px-4 py-4 shrink-0">
+            {/* Mode & Level Selector */}
+            <div className="max-w-3xl mx-auto mb-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-gray-500">Mode:</span>
+              {[
+                { value: 'scholar', label: 'Scholar' },
+                { value: 'mentor', label: 'Mentor' },
+                { value: 'revision', label: 'Revision' },
+                { value: 'practice', label: 'Practice' },
+              ].map((m) => (
+                <button
+                  key={m.value}
+                  onClick={() => setMode(m.value)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    mode === m.value
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+
+              <span className="mx-1 text-gray-300">|</span>
+              <span className="text-xs font-medium text-gray-500">Level:</span>
+              {[
+                { value: 'beginner', label: 'Beginner' },
+                { value: 'intermediate', label: 'Intermediate' },
+                { value: 'advanced', label: 'Advanced' },
+              ].map((l) => (
+                <button
+                  key={l.value}
+                  onClick={() => setLevel(l.value)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    level === l.value
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+
             <div className="max-w-3xl mx-auto flex items-end gap-3">
               <textarea
                 ref={inputRef}
@@ -313,7 +443,7 @@ export default function AIStudyBot() {
                 onKeyDown={handleKeyDown}
                 placeholder="Ask a study question..."
                 rows={1}
-                className="flex-1 resize-none rounded-xl border border-purple-200 bg-white px-4 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-shadow"
+                className="flex-1 resize-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400 transition-colors"
                 style={{ maxHeight: '120px' }}
                 onInput={(e) => {
                   e.target.style.height = 'auto';
@@ -322,8 +452,8 @@ export default function AIStudyBot() {
               />
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || loading}
-                className="shrink-0 w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl flex items-center justify-center hover:shadow-lg hover:scale-105 transition-all disabled:opacity-40 disabled:hover:scale-100 disabled:hover:shadow-none"
+                disabled={!input.trim() || loading || streaming}
+                className="shrink-0 w-10 h-10 bg-purple-600 text-white rounded-lg flex items-center justify-center hover:bg-purple-700 transition-colors disabled:opacity-40"
                 aria-label="Send message"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,6 +466,38 @@ export default function AIStudyBot() {
             </p>
           </div>
         </main>
+
+        {/* Right Sidebar — Related Questions (always rendered, stable width) */}
+        <aside className="hidden lg:flex flex-col w-[280px] shrink-0 bg-gray-50 border-l border-gray-200">
+          <div className="p-4 border-b border-gray-200 shrink-0">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Related Questions</h2>
+            {currentSubject && (
+              <span className="inline-block mt-1.5 px-2 py-0.5 text-xs font-medium bg-purple-50 text-purple-600 rounded-full">
+                {currentSubject}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {suggestions.length > 0 ? (
+              suggestions.map((s) => (
+                <button
+                  key={s._id}
+                  onClick={() => handleSuggestionClick(s)}
+                  className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-white transition-colors group"
+                >
+                  <p className="line-clamp-2 leading-snug">{s.text}</p>
+                  <p className="text-xs text-gray-400 mt-1 group-hover:text-purple-500">
+                    {s.globalCount} student{s.globalCount !== 1 ? 's' : ''} asked
+                  </p>
+                </button>
+              ))
+            ) : (
+              <div className="text-sm text-gray-400 text-center py-8 px-4">
+                No related questions yet. Start chatting to see suggestions here.
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );

@@ -1,5 +1,17 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+
+const TOPIC_COLORS = {
+  Math: 'from-blue-500 to-blue-700',
+  Physics: 'from-orange-500 to-orange-700',
+  Chemistry: 'from-green-500 to-green-700',
+  Biology: 'from-pink-500 to-pink-700',
+  'Exam Prep': 'from-yellow-500 to-yellow-700',
+  Other: 'from-gray-500 to-gray-700',
+};
 
 const stats = [
   { label: 'Courses Enrolled', value: '0', icon: '📚' },
@@ -17,6 +29,18 @@ const features = [
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
+  const [topTopics, setTopTopics] = useState([]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('scholarsOrbitToken');
+    if (!token) return;
+    fetch(`${API_URL}/api/users/top-topics`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.topics) setTopTopics(data.topics); })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-dark-900 via-dark-800 to-dark-900">
@@ -62,6 +86,24 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+
+        {/* Top Topics */}
+        {topTopics.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-xl font-display font-bold text-white mb-4">Your Top Topics</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {topTopics.map((t) => (
+                <div key={t.topic} className="bg-dark-800 rounded-xl p-4 border border-dark-700">
+                  <div className={`w-10 h-10 bg-gradient-to-br ${TOPIC_COLORS[t.topic] || TOPIC_COLORS.Other} rounded-lg flex items-center justify-center mb-3`}>
+                    <span className="text-white font-bold text-sm">{t.topic.charAt(0)}</span>
+                  </div>
+                  <p className="text-white font-semibold text-sm">{t.topic}</p>
+                  <p className="text-gray-400 text-xs mt-1">{t.count} question{t.count !== 1 ? 's' : ''}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Feature cards */}
         <h2 className="text-xl font-display font-bold text-white mb-4">Quick Access</h2>

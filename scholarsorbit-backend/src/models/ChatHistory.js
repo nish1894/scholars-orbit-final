@@ -11,6 +11,10 @@ const messageSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    subject: {
+      type: String,
+      enum: ['Math', 'Physics', 'Chemistry', 'Biology', 'Exam Prep', 'Other'],
+    },
   },
   { _id: false, timestamps: true }
 );
