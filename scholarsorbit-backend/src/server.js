@@ -7,6 +7,7 @@ import userRoutes from './routes/users.js';
 import noteRoutes from './routes/notes.js';
 import chatRoutes from './routes/chat.js';
 import suggestionRoutes from './routes/suggestions.js';
+import resourceRoutes from './routes/resources.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -45,6 +46,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/suggestions', suggestionRoutes);
+app.use('/api/resources', resourceRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

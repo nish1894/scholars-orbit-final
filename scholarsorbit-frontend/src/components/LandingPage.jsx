@@ -145,13 +145,13 @@ const LandingPage = () => {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-blue-600 opacity-20 blur-3xl"></div>
               <div className="relative grid grid-cols-2 gap-4">
-                <div className="card space-y-3 transform hover:-translate-y-2 transition-transform cursor-pointer">
+                <Link to="/resources" className="card space-y-3 transform hover:-translate-y-2 transition-transform cursor-pointer block">
                   <div className="w-12 h-12 bg-primary-500/20 rounded-lg flex items-center justify-center">
                     <span className="text-2xl">📚</span>
                   </div>
                   <h3 className="text-lg font-semibold text-white">Resource Library</h3>
                   <p className="text-sm text-gray-400">Access thousands of notes, videos & PDFs</p>
-                </div>
+                </Link>
                 
                 <Link to="/ai-study-bot" className="card space-y-3 transform hover:-translate-y-2 transition-transform cursor-pointer mt-8 block">
                   <div className="w-12 h-12 bg-primary-500/20 rounded-lg flex items-center justify-center">

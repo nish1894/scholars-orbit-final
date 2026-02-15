@@ -109,7 +109,11 @@ export default function DashboardPage() {
         <h2 className="text-xl font-display font-bold text-white mb-4">Quick Access</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {features.map((f) => {
-            const isAI = f.title === 'AI Assistant';
+            const linkMap = {
+              'AI Assistant': '/ai-study-bot',
+              'Resource Library': '/resources',
+            };
+            const href = linkMap[f.title];
             const card = (
               <div
                 key={f.title}
@@ -122,8 +126,8 @@ export default function DashboardPage() {
                 <p className="text-sm text-gray-400">{f.desc}</p>
               </div>
             );
-            return isAI ? (
-              <Link to="/ai-study-bot" key={f.title}>{card}</Link>
+            return href ? (
+              <Link to={href} key={f.title}>{card}</Link>
             ) : (
               card
             );
