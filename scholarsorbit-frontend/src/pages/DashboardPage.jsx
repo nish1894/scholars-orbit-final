@@ -112,6 +112,7 @@ export default function DashboardPage() {
             const linkMap = {
               'AI Assistant': '/ai-study-bot',
               'Resource Library': '/resources',
+              'Live Chat': '/messages',
             };
             const href = linkMap[f.title];
             const card = (

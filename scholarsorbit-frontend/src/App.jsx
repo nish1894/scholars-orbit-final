@@ -6,6 +6,7 @@ import SignupPageFull from './pages/SignupPageFull';
 import ProfilePage from './pages/ProfilePage';
 import AIStudyBot from './pages/AIStudyBot';
 import ResourceLibrary from './pages/ResourceLibrary';
+import DirectMessages from './pages/DirectMessages';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginModal from './pages/LoginPage';
 import SignupModal from './pages/SignupPage';
@@ -20,6 +21,7 @@ function AppContent() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/ai-study-bot" element={<AIStudyBot />} />
         <Route path="/resources" element={<ResourceLibrary />} />
+        <Route path="/messages" element={<DirectMessages />} />
         <Route path="/login" element={<LoginPageFull />} />
         <Route path="/signup" element={<SignupPageFull />} />
         <Route
